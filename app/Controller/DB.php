@@ -2,6 +2,8 @@
 
 namespace App\Controller;
 
+require 'app/config/config.php';
+
 use PDO;
 
 class DB 
@@ -12,7 +14,7 @@ class DB
     public static function connectWriteDB()
     {
         if (self::$writeDBConnection === null) {
-            self::$writeDBConnection = new PDO('mysql:host=127.0.0.1;dbname=tasks', 'root', '0410');
+            self::$writeDBConnection = new PDO('mysql:host='.DB_HOST.';dbname='.DB_NAME.'', DB_USER, DB_PASS);
             self::$writeDBConnection->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
             self::$writeDBConnection->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);
         }
@@ -23,7 +25,7 @@ class DB
     public static function connectreadDB()
     {
         if (self::$readDBConnection === null) {
-            self::$readDBConnection = new PDO('mysql:host=127.0.0.1;dbname=tasks', 'root', '0410');
+            self::$readDBConnection = new PDO('mysql:host='.DB_HOST.';dbname='.DB_NAME.'', DB_USER, DB_PASS);
             self::$readDBConnection->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
             self::$readDBConnection->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);
         }
