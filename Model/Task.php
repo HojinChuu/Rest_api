@@ -34,7 +34,8 @@ class Task
         return $this->_description;
     }
 
-    public function getDeadline() : string
+    // public function getDeadline() : string
+    public function getDeadline() 
     {
         return $this->_deadline;
     }
