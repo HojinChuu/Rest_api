@@ -1,6 +1,6 @@
 <?php
 
-require_once './db.php';
+require_once 'db.php';
 require_once '../Model/Task.php';
 require_once '../Model/Response.php';
 
@@ -17,7 +17,7 @@ try {
     exit();
 }
 
-// url request taskid
+// URL request taskid
 if (array_key_exists("taskid", $_GET)) {
     $taskId = $_GET['taskid'];
 
@@ -83,7 +83,6 @@ if (array_key_exists("taskid", $_GET)) {
             $response->send();
             exit();
         }
-
     } 
 
     // DELETE REQUEST
@@ -138,7 +137,7 @@ if (array_key_exists("taskid", $_GET)) {
     }
 }
 
-// url request completed
+// URL request completed
 else if (array_key_exists("completed", $_GET)) {
     $completed = $_GET['completed'];
 
@@ -208,4 +207,78 @@ else if (array_key_exists("completed", $_GET)) {
         $response->send();
         exit();
     }
+}
+
+// URL request none : ALL tasks
+else if (empty($_GET)) {
+
+    // GET METHOD
+    if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+        try {
+            $sql = 'SELECT id, title, description, DATE_FORMAT(deadline, "%d/%m/%Y %H:%i") AS deadline, completed FROM tbltasks';
+            $query = $readDB->prepare($sql);
+            $query->execute();
+
+            $rowCount = $query->rowCount();
+            $taskArray = array();
+
+            while($row = $query->fetch()) {
+                $task = new Task($row->id, $row->title, $row->description, $row->deadline, $row->completed);
+                $taskArray[] = $task->returnTaskArray();
+            }
+
+            $returnData = array();
+            $returnData['rows_returned'] = $rowCount;
+            $returnData['tasks'] = $taskArray;
+            
+            $response = new Response();
+            $response->setHttpStatusCode(200);
+            $response->setSuccess(true);
+            $response->toCache(true);
+            $response->setData($returnData);
+            $response->send();
+            exit();
+
+        } catch (TaskException $e) {
+            $response = new Response();
+            $response->setHttpStatusCode(500);
+            $response->setSuccess(false);
+            $response->addMessage($e->getMessage());
+            $response->send();
+            exit();
+        } catch (PDOException $e) {
+            error_log("DB query error : {$e}", 0);
+            $response = new Response();
+            $response->setHttpStatusCode(500);
+            $response->setSuccess(false);
+            $response->addMessage("Failed to get Tasks");
+            $response->send();
+            exit();
+        }
+    } 
+    
+    // POST REQUEST
+    else if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        
+    } 
+
+    // REQUEST
+    else {
+        $response = new Response();
+        $response->setHttpStatusCode(405);
+        $response->setSuccess(false);
+        $response->addMessage("Request method not allowed");
+        $response->send();
+        exit();
+    }
+}
+
+// error response
+else {
+    $response = new Response();
+    $response->setHttpStatusCode(404);
+    $response->setSuccess(false);
+    $response->addMessage("Endpoint not found");
+    $response->send();
+    exit();
 }
