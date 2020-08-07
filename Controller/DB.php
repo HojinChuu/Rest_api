@@ -1,10 +1,6 @@
 <?php
 
-namespace App\Controller;
-
-require 'app/config/config.php';
-
-use PDO;
+require 'config/config.php';
 
 class DB 
 {

@@ -1,4 +1,4 @@
 restapi.sql
 .htaccess
 vendor
-app/config/config.php
+config/config.php

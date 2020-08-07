@@ -1,8 +1,7 @@
 <?php
 
-require 'vendor/autoload.php';
-
-use App\Model\Response;
+require 'Model/Response.php';
+require 'Controller/DB.php';
 
 // $response = new Response;
 
@@ -11,8 +10,6 @@ use App\Model\Response;
 // $response->addMessage("test message 1");
 // $response->addMessage("test message 2");
 // $response->send();
-
-use App\Controller\DB;
 
 try {
     $writeDB = DB::connectWriteDB();
