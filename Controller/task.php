@@ -21,8 +21,6 @@ try {
 if (array_key_exists("taskid", $_GET)) {
     $taskId = $_GET['taskid'];
 
-    var_dump($taskId);
-    die();
     if ($taskId == '' || !is_numeric($taskId)) {
         $response = new Response();
         $response->setHttpStatusCode(400);
@@ -377,7 +375,8 @@ else if (empty($_GET)) {
 
             $postData = file_get_contents('php://input');
 
-            if(($jsonData = json_decode($postData)) === false) {
+            // if(($jsonData = json_decode($postData)) === false) {
+            if(!$jsonData = json_decode($postData)) {
                 $response = new Response();
                 $response->setHttpStatusCode(400);
                 $response->setSuccess(false);
@@ -405,7 +404,7 @@ else if (empty($_GET)) {
 
             $sql = 'INSERT INTO tbltasks (title, description, deadline, completed)
                     VALUES (:title, :description, STR_TO_DATE(:deadline, \'%d/%m/%Y %H:%i\'), :completed)';
-            $query = $readDB->prepare($sql);
+            $query = $writeDB->prepare($sql);
             $query->bindParam(':title', $title, PDO::PARAM_STR);
             $query->bindParam(':description', $description, PDO::PARAM_STR);
             $query->bindParam(':deadline', $deadline, PDO::PARAM_STR);
