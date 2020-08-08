@@ -2,7 +2,6 @@
 
 require_once 'db.php';
 require_once '../Model/Response.php';
-// require_once '../Model/User.php';
 
 try {
     $writeDB = DB::connectWriteDB();
