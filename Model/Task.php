@@ -19,28 +19,27 @@ class Task
         $this->setCompleted($completed);      
     }
 
-    public function getID() : int
+    public function getID()
     {
         return $this->_id;
     }
 
-    public function getTitle() : string
+    public function getTitle()
     {
         return $this->_title;
     }
 
-    public function getDescription() : string
+    public function getDescription()
     {
         return $this->_description;
     }
 
-    // public function getDeadline() : string
     public function getDeadline() 
     {
         return $this->_deadline;
     }
 
-    public function getCompleted() : string
+    public function getCompleted()
     {
         return $this->_completed;
     }
