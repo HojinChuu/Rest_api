@@ -74,7 +74,7 @@ $username = trim($jsonData->username);
 $password = $jsonData->password;
 
 try {
-    $sql = 'SELECT id FROM tblusers WHERE username = :username';
+    $sql = 'SELECT id FROM users WHERE username = :username';
     $query = $writeDB->prepare($sql);
     $query->bindParam(':username', $username, PDO::PARAM_STR);
     $query->execute();
@@ -91,7 +91,7 @@ try {
 
     $hashed_password = password_hash($password, PASSWORD_DEFAULT);
 
-    $sql = 'INSERT INTO tblusers (fullname, username, password) VALUES (:fullname, :username, :password)';
+    $sql = 'INSERT INTO users (fullname, username, password) VALUES (:fullname, :username, :password)';
     $query = $writeDB->prepare($sql);
     $query->bindParam(':fullname', $fullname, PDO::PARAM_STR);
     $query->bindParam(':username', $username, PDO::PARAM_STR);

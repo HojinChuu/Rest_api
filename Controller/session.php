@@ -42,7 +42,7 @@ if (array_key_exists("sessionid", $_GET)) {
 
     if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
         try {
-            $sql = 'DELETE FROM tblsessions 
+            $sql = 'DELETE FROM sessions 
                     WHERE id = :session_id 
                     AND access_token = :access_token';
             $query = $writeDB->prepare($sql);
@@ -116,15 +116,15 @@ if (array_key_exists("sessionid", $_GET)) {
         try {
             $refresh_token = $jsonData->refresh_token;
 
-            $sql = 'SELECT tblsessions.id as session_id, 
-                            tblsessions.user_id as userid, 
+            $sql = 'SELECT sessions.id as session_id, 
+                            sessions.user_id as userid, 
                             access_token, refresh_token, useractive, loginattempts, 
                             access_token_expiry, refresh_token_expiry 
-                    FROM tblsessions, tblusers
-                    WHERE tblusers.id = tblsessions.user_id 
-                    AND tblsessions.id = :session_id
-                    AND tblsessions.access_token = :access_token
-                    AND tblsessions.refresh_token = :refresh_token';
+                    FROM sessions, users
+                    WHERE users.id = sessions.user_id 
+                    AND sessions.id = :session_id
+                    AND sessions.access_token = :access_token
+                    AND sessions.refresh_token = :refresh_token';
             $query = $writeDB->prepare($sql);
             $query->bindParam(':session_id', $session_id, PDO::PARAM_INT);
             $query->bindParam(':access_token', $access_token, PDO::PARAM_STR);
@@ -185,7 +185,7 @@ if (array_key_exists("sessionid", $_GET)) {
             $access_token_expiry_seconds = 1200;
             $refresh_token_expiry_seconds = 1209600; // 14 day
 
-            $sql = 'UPDATE tblsessions SET access_token = :access_token, access_token_expiry = date_add(NOW(), INTERVAL :access_token_expiry_seconds SECOND), refresh_token = :refresh_token, refresh_token_expiry = date_add(NOW(), INTERVAL :refresh_token_expiry_seconds SECOND) 
+            $sql = 'UPDATE sessions SET access_token = :access_token, access_token_expiry = date_add(NOW(), INTERVAL :access_token_expiry_seconds SECOND), refresh_token = :refresh_token, refresh_token_expiry = date_add(NOW(), INTERVAL :refresh_token_expiry_seconds SECOND) 
                     WHERE id = :session_id
                     AND user_id = :user_id
                     AND access_token = :returned_access_token
@@ -307,7 +307,7 @@ else if (empty($_GET)) {
         $password = $jsonData->password;
 
         $sql = 'SELECT id, fullname, username, password, useractive, loginattempts
-                FROM tblusers
+                FROM users
                 WHERE username = :username';
         $query = $writeDB->prepare($sql);
         $query->bindParam(':username', $username, PDO::PARAM_STR);
@@ -354,7 +354,7 @@ else if (empty($_GET)) {
         }
 
         if (!password_verify($password, $returned_password)) {
-            $sql = 'UPDATE tblusers SET loginattempts = loginattempts+1 WHERE id = :id';
+            $sql = 'UPDATE users SET loginattempts = loginattempts+1 WHERE id = :id';
             $query = $writeDB->prepare($sql);
             $query->bindParam(':id', $returned_id, PDO::PARAM_INT);
             $query->execute();
@@ -387,12 +387,12 @@ else if (empty($_GET)) {
         // 트랜잭션 ( 두 테이블 간 일관성 )
         $writeDB->beginTransaction();
 
-        $sql = 'UPDATE tblusers SET loginattempts = 0 WHERE id = :id';
+        $sql = 'UPDATE users SET loginattempts = 0 WHERE id = :id';
         $query = $writeDB->prepare($sql);
         $query->bindParam(':id', $returned_id, PDO::PARAM_INT);
         $query->execute();
 
-        $sql = 'INSERT INTO tblsessions (user_id, access_token, access_token_expiry, refresh_token, refresh_token_expiry) 
+        $sql = 'INSERT INTO sessions (user_id, access_token, access_token_expiry, refresh_token, refresh_token_expiry) 
                 VALUES (:user_id, :access_token, date_add(NOW(), INTERVAL :access_token_expiry_seconds SECOND), :refresh_token, date_add(NOW(), INTERVAL :refresh_token_expiry_seconds SECOND))';
         $query = $writeDB->prepare($sql);
         $query->bindParam(':user_id', $returned_id, PDO::PARAM_INT);

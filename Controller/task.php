@@ -34,7 +34,7 @@ if (array_key_exists("taskid", $_GET)) {
     if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         try {
             $sql = 'SELECT id, title, description, DATE_FORMAT(deadline, "%d/%m/%Y %H:%i") AS deadline, completed 
-                    FROM tbltasks 
+                    FROM tasks 
                     WHERE id = :taskid';
             $query = $readDB->prepare($sql); 
             $query->bindParam(':taskid', $taskId, PDO::PARAM_INT);
@@ -88,7 +88,7 @@ if (array_key_exists("taskid", $_GET)) {
     // DELETE REQUEST
     else if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
         try {
-            $sql = 'DELETE FROM tbltasks WHERE id = :taskid';
+            $sql = 'DELETE FROM tasks WHERE id = :taskid';
             $query = $writeDB->prepare($sql);
             $query->bindParam(':taskid', $taskId, PDO::PARAM_INT);
             $query->execute();
@@ -184,7 +184,7 @@ if (array_key_exists("taskid", $_GET)) {
             $queryFields = rtrim($queryFields, ", ");
 
             $sql = 'SELECT id, title, description, DATE_FORMAT(deadline, "%d/%m/%Y %H:%i") AS deadline, completed 
-                    FROM tbltasks 
+                    FROM tasks 
                     WHERE id = :taskid';
             $query = $writeDB->prepare($sql);
             $query->bindParam(':taskid', $taskId, PDO::PARAM_INT);
@@ -204,7 +204,7 @@ if (array_key_exists("taskid", $_GET)) {
                 $task = new Task($row->id, $row->title, $row->description, $row->deadline, $row->completed);
             }
 
-            $queryString = "UPDATE tbltasks SET {$queryFields} WHERE id = :taskid";
+            $queryString = "UPDATE tasks SET {$queryFields} WHERE id = :taskid";
 
             $query = $writeDB->prepare($queryString);
 
@@ -247,7 +247,7 @@ if (array_key_exists("taskid", $_GET)) {
             }
 
             $sql = 'SELECT id, title, description, DATE_FORMAT(deadline, "%d/%m/%Y %H:%i") AS deadline, completed 
-                    FROM tbltasks 
+                    FROM tasks 
                     WHERE id = :taskid';
             $query = $writeDB->prepare($sql);
             $query->bindParam(':taskid', $taskId, PDO::PARAM_INT);
@@ -329,7 +329,7 @@ else if (array_key_exists("completed", $_GET)) {
     if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         try {
             $sql = 'SELECT id, title, description, DATE_FORMAT(deadline, "%d/%m/%Y %H:%i") AS deadline, completed 
-                    FROM tbltasks 
+                    FROM tasks 
                     WHERE completed = :completed';
             $query = $readDB->prepare($sql);
             $query->bindParam(':completed', $completed, PDO::PARAM_STR);
@@ -403,7 +403,7 @@ else if (array_key_exists("page", $_GET)) {
         $limitPerPage = 20;
 
         try {
-            $sql = 'SELECT count(id) as totalCount FROM tbltasks';
+            $sql = 'SELECT count(id) as totalCount FROM tasks';
             $query = $readDB->prepare($sql);
             $query->execute();
 
@@ -428,7 +428,7 @@ else if (array_key_exists("page", $_GET)) {
             $offset = ($page == 1 ? 0 : ($limitPerPage * ($page - 1)));
 
             $sql = 'SELECT id, title, description, DATE_FORMAT(deadline, "%d/%m/%Y %H:%i") AS deadline, completed 
-                    FROM tbltasks 
+                    FROM tasks 
                     LIMIT :pageLimit offset :offset';           
             $query = $readDB->prepare($sql);
             $query->bindParam(':pageLimit', $limitPerPage, PDO::PARAM_INT);
@@ -494,7 +494,7 @@ else if (empty($_GET)) {
     // GET METHOD
     if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         try {
-            $sql = 'SELECT id, title, description, DATE_FORMAT(deadline, "%d/%m/%Y %H:%i") AS deadline, completed FROM tbltasks';
+            $sql = 'SELECT id, title, description, DATE_FORMAT(deadline, "%d/%m/%Y %H:%i") AS deadline, completed FROM tasks';
             $query = $readDB->prepare($sql);
             $query->execute();
 
@@ -577,7 +577,7 @@ else if (empty($_GET)) {
             $deadline = $newTask->getDeadline();
             $completed = $newTask->getCompleted();
 
-            $sql = 'INSERT INTO tbltasks (title, description, deadline, completed)
+            $sql = 'INSERT INTO tasks (title, description, deadline, completed)
                     VALUES (:title, :description, STR_TO_DATE(:deadline, \'%d/%m/%Y %H:%i\'), :completed)';
             $query = $writeDB->prepare($sql);
             $query->bindParam(':title', $title, PDO::PARAM_STR);
@@ -599,7 +599,7 @@ else if (empty($_GET)) {
             $lastTaskID = $writeDB->lastInsertId();
 
             $sql = 'SELECT id, title, description, DATE_FORMAT(deadline, "%d/%m/%Y %H:%i") AS deadline, completed 
-                    FROM tbltasks 
+                    FROM tasks 
                     WHERE id = :taskid';
             $query = $writeDB->prepare($sql);
             $query->bindParam(':taskid', $lastTaskID, PDO::PARAM_INT);
