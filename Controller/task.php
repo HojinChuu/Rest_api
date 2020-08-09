@@ -8,7 +8,6 @@ try {
     $writeDB = DB::connectWriteDB();
     $readDB = DB::connectreadDB();
 } catch (PDOException $e) {
-    error_log("Connection error : {$e}", 0);
     $response = new Response();
     $response->setHttpStatusCode(500);
     $response->setSuccess(false);
@@ -152,7 +151,6 @@ if (array_key_exists("taskid", $_GET)) {
             $response->send();
             exit();
         } catch (PDOException $e) {
-            error_log("DB query error : {$e}", 0);
             $response = new Response();
             $response->setHttpStatusCode(500);
             $response->setSuccess(false);
@@ -189,7 +187,6 @@ if (array_key_exists("taskid", $_GET)) {
             exit();
 
         } catch (PDOException $e) {
-            error_log("DB query error : {$e}", 0);
             $response = new Response();
             $response->setHttpStatusCode(500);
             $response->setSuccess(false);
@@ -374,7 +371,6 @@ if (array_key_exists("taskid", $_GET)) {
             $response->send();
             exit();
         } catch (PDOException $e) {
-            error_log("DB query error : {$e}", 0);
             $response = new Response();
             $response->setHttpStatusCode(500);
             $response->setSuccess(false);
@@ -448,7 +444,6 @@ else if (array_key_exists("completed", $_GET)) {
             $response->send();
             exit();
         } catch (PDOException $e) {
-            error_log("DB query error : {$e}", 0);
             $response = new Response();
             $response->setHttpStatusCode(500);
             $response->setSuccess(false);
@@ -555,7 +550,6 @@ else if (array_key_exists("page", $_GET)) {
             $response->send();
             exit();
         } catch (PDOException $e) {
-            error_log("DB query error : {$e}", 0);
             $response = new Response();
             $response->setHttpStatusCode(500);
             $response->setSuccess(false);
@@ -617,7 +611,6 @@ else if (empty($_GET)) {
             $response->send();
             exit();
         } catch (PDOException $e) {
-            error_log("DB query error : {$e}", 0);
             $response = new Response();
             $response->setHttpStatusCode(500);
             $response->setSuccess(false);
@@ -736,7 +729,6 @@ else if (empty($_GET)) {
             $response->send();
             exit();
         } catch (PDOException $e) {
-            error_log("DB query error : {$e}", 0);
             $response = new Response();
             $response->setHttpStatusCode(500);
             $response->setSuccess(false);

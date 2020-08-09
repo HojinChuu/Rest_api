@@ -6,7 +6,6 @@ require_once '../Model/Response.php';
 try {
     $writeDB = DB::connectWriteDB();
 } catch (PDOException $e) {
-    error_log("Connection error : {$e}", 0);
     $response = new Response();
     $response->setHttpStatusCode(500);
     $response->setSuccess(false);
