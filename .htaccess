@@ -1,7 +1,7 @@
 # CORS header
 Header set Access-Control-Allow-Origin "*"
-Header set Access-Control-Allow-Methods "GET, POST, PATCH, DELETE, OPTIONS"
-# Header always set Access-Control-Allow-Headers "content-type"
+Header set Access-Control-Allow-Methods "GET,PUT,PATCH,POST,DELETE"
+Header set Access-Control-Allow-Headers "Content-Type, Authorization"
 
 # fix HTTP_AUTHORIZATION header
 SetEnvIf Authorization .+ HTTP_AUTHORIZATION=$0
