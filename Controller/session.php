@@ -116,15 +116,14 @@ if (array_key_exists("sessionid", $_GET)) {
         try {
             $refresh_token = $jsonData->refresh_token;
 
-            $sql = 'SELECT sessions.id as session_id, 
-                            sessions.user_id as userid, 
-                            access_token, refresh_token, useractive, loginattempts, 
-                            access_token_expiry, refresh_token_expiry 
-                    FROM sessions, users
-                    WHERE users.id = sessions.user_id 
-                    AND sessions.id = :session_id
-                    AND sessions.access_token = :access_token
-                    AND sessions.refresh_token = :refresh_token';
+            $sql = 'SELECT s.id as session_id, s.user_id as userid,
+                           s.access_token, s.refresh_token, 
+                           u.useractive, u.loginattempts,
+                           s.access_token_expiry, s.refresh_token_expiry
+                    FROM sessions as s LEFT JOIN users as u ON s.id = u.id 
+                    WHERE u.id = 1 AND s.id = :session_id 
+                    AND s.access_token = :access_token
+                    AND s.refresh_token = :refresh_token';
             $query = $writeDB->prepare($sql);
             $query->bindParam(':session_id', $session_id, PDO::PARAM_INT);
             $query->bindParam(':access_token', $access_token, PDO::PARAM_STR);
