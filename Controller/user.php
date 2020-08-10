@@ -2,7 +2,11 @@
 
 require_once 'db.php';
 require_once '../Model/Response.php';
-require '../lib/cors.php';
+require_once '../lib/cors.php';
+
+// cors
+$CORS = new Cors();
+$CORS();
 
 try {
     $writeDB = DB::connectWriteDB();
