@@ -244,7 +244,7 @@ if (array_key_exists("taskid", $_GET)) {
 
             if (isset($jsonData->deadline)) {
                 $deadline_updated = true;
-                $queryFields .= "deadline = STR_TO_DATE(:deadline, '%d/%m/%Y %H:%i), ";
+                $queryFields .= 'deadline = STR_TO_DATE(:deadline, \'%d/%m/%Y %H:%i\'), ';
             }
 
             if (isset($jsonData->completed)) {
