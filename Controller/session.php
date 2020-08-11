@@ -124,8 +124,8 @@ if (array_key_exists("sessionid", $_GET)) {
                            s.access_token, s.refresh_token, 
                            u.useractive, u.loginattempts,
                            s.access_token_expiry, s.refresh_token_expiry
-                    FROM sessions as s LEFT JOIN users as u ON s.id = u.id 
-                    WHERE u.id = 1 AND s.id = :session_id 
+                    FROM sessions as s LEFT JOIN users as u ON s.user_id = u.id 
+                    WHERE s.id = :session_id 
                     AND s.access_token = :access_token
                     AND s.refresh_token = :refresh_token';
             $query = $writeDB->prepare($sql);

@@ -143,7 +143,7 @@ if (array_key_exists("taskid", $_GET)) {
             $response = new Response();
             $response->setHttpStatusCode(200);
             $response->setSuccess(true);
-            $response->toCache(true);
+            // $response->toCache(true);
             $response->setData($returnData);
             $response->send();
             exit();
@@ -436,7 +436,7 @@ else if (array_key_exists("completed", $_GET)) {
             $response = new Response();
             $response->setHttpStatusCode(200);
             $response->setSuccess(true);
-            $response->toCache(true);
+            // $response->toCache(true);
             $response->setData($returnData);
             $response->send();
             exit();
@@ -542,7 +542,7 @@ else if (array_key_exists("page", $_GET)) {
             $response = new Response();
             $response->setHttpStatusCode(200);
             $response->setSuccess(true);
-            $response->toCache(true);
+            // $response->toCache(true);
             $response->setData($returnData);
             $response->send();
             exit();
@@ -603,7 +603,7 @@ else if (empty($_GET)) {
             $response = new Response();
             $response->setHttpStatusCode(200);
             $response->setSuccess(true);
-            $response->toCache(true);
+            // $response->toCache(true);
             $response->setData($returnData);
             $response->send();
             exit();
