@@ -25,3 +25,8 @@ RewriteRule ^tasks/complete$ Controller/task.php?completed=Y [L]
 RewriteRule ^tasks/incomplete$ Controller/task.php?completed=N [L]
 RewriteRule ^tasks/page/([0-9]+)$ Controller/task.php?page=$1 [L]
 RewriteRule ^tasks$ Controller/task.php [L]
+
+# Images
+RewriteRule ^tasks/([0-9]+)/images/([0-9]+)/attributes$ Controller/image.php?taskid=$1&imageid=$2&attributes=true [L]
+RewriteRule ^tasks/([0-9]+)/images/([0-9]+)$ Controller/image.php?taskid=$1&imageid=$2 [L]
+RewriteRule ^tasks/([0-9]+)/images$ Controller/image.php?taskid=$1 [L]
