@@ -18,7 +18,7 @@ class Image
         $this->setFilename($filename);
         $this->setMimetype($mimetype);
         $this->setTaskID($taskid);
-        $this->_uploadFolderLocation = "../images";
+        $this->_uploadFolderLocation = "../images/";
     }
 
     public function getID()
@@ -112,6 +112,25 @@ class Image
         }
 
         $this->_taskid = $taskid;
+    }
+
+    public function saveImageFile($tempFileName)
+    {
+        $uploadedFilePath = $this->getUploadFolderLocation().$this->getTaskID().'/'.$this->getFilename();
+
+        if (!is_dir($this->getUploadFolderLocation().$this->getTaskID())) {
+            if (!mkdir($this->getUploadFolderLocation().$this->getTaskID())) {
+                throw new ImageException("Failed to create image upload folder for task");
+            }
+        }
+
+        if (!file_exists($tempFileName)) {
+            throw new ImageException("Failed to upload image file");
+        }
+
+        if (!move_uploaded_file($tempFileName, $uploadedFilePath)) {
+            throw new ImageException("Failed to upload image file");
+        }
     }
 
     public function returnImageAsArray()

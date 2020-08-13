@@ -21,6 +21,165 @@ function sendResponse($status, $success, $message = null, $toCache = false, $dat
     exit();
 }
 
+function uploadImageRoute($readDB, $writeDB, $taskid, $returned_userid)
+{
+    try {
+        
+        if (!isset($_SERVER['CONTENT_TYPE']) || strpos($_SERVER['CONTENT_TYPE'], "multipart/form-data; boundary=") === false) {
+            sendResponse(400, false, "Content type header not set to multipart/form-data with a boundary");
+        }
+
+        $sql = 'SELECT id FROM tasks 
+                WHERE id = :taskid AND user_id = :userid';
+        $query = $readDB->prepare($sql);
+        $query->bindParam(':taskid', $taskid, PDO::PARAM_INT);
+        $query->bindParam(':userid', $returned_userid, PDO::PARAM_INT);
+        $query->execute();
+
+        $rowCount = $query->rowCount();
+        if ($rowCount === 0) {
+            sendResponse(404, false, "Task Not found");
+        }
+        
+        if (!isset($_POST['attributes'])) {
+            sendResponse(400, false, "Attributes missing from body of request");
+        }
+
+        if (!$jsonImageAttributes = json_decode($_POST['attributes'])) {
+            sendResponse(400, false, "Attributes field is not valid json");
+        } 
+
+        if (!isset($jsonImageAttributes->title) || !isset($jsonImageAttributes->filename) || $jsonImageAttributes->title == '' || $jsonImageAttributes->filename == '') {
+            sendResponse(400, false, "Title and Filename fields error");
+        }
+
+        if (strpos($jsonImageAttributes->filename, ".") > 0) {
+            sendResponse(400, false, "Filename dot err");
+        }
+
+        if (!isset($_FILES['imagefile']) || $_FILES['imagefile']['error'] !== 0) {
+            sendResponse(500, false, "Image file upload failed");
+        }
+
+        $imageFileDetails = getimagesize($_FILES['imagefile']['tmp_name']);
+
+        if (isset($_FILES['imagefile']['size']) && $_FILES['imagefile']['size'] > 5242880) {
+            sendResponse(500, false, "File mush be under 5mb");
+        }
+
+        $allowedImageFileTypes = array('image/jpeg', 'image/gif', 'image/png');
+
+        if (!in_array($imageFileDetails['mime'], $allowedImageFileTypes)) {
+            sendResponse(400, false, "File type not supported");
+        }
+
+        $fileExtension = "";
+        switch ($imageFileDetails['mime']) {
+            case 'image/jpeg':
+                $fileExtension = ".jpg";
+                break;
+            case 'image/gif':
+                $fileExtension = ".gif";
+                break;
+            case 'image/png':
+                $fileExtension = ".png";
+                break;
+            default:
+                break;
+        }
+
+        if ($fileExtension == "") {
+            sendResponse(400, false, "No valid file extension found for mime");
+        }
+
+        $image = new Image(null, $jsonImageAttributes->title, $jsonImageAttributes->filename.$fileExtension, $imageFileDetails['mime'], $taskid);
+
+        $title = $image->getTitle();
+        $newFileName = $image->getFilename();
+        $mimetype = $image->getMimetype();
+
+        $sql = 'SELECT images.id FROM images, tasks
+                WHERE images.taskid = tasks.id
+                AND tasks.id = :taskid
+                AND tasks.user_id = :userid
+                AND images.filename = :filename';
+        $query = $readDB->prepare($sql);
+        $query->bindParam(':taskid', $taskid, PDO::PARAM_INT);
+        $query->bindParam(':userid', $returned_userid, PDO::PARAM_INT);
+        $query->bindParam(':filename', $newFileName, PDO::PARAM_STR);
+        $query->execute();
+
+        $rowCount = $query->rowCount();
+        ($rowCount !== 0) ? sendResponse(404, false, "already filename for this task") : null;
+
+        // transaction
+        $writeDB->beginTransaction();
+
+        $sql = 'INSERT INTO images (title, filename, mimetype, taskid)
+                VALUES (:title, :filename, :mimetype, :taskid)';
+        $query = $writeDB->prepare($sql);
+        $query->bindParam(':title', $title, PDO::PARAM_STR);
+        $query->bindParam(':filename', $newFileName, PDO::PARAM_STR);
+        $query->bindParam(':mimetype', $mimetype, PDO::PARAM_STR);
+        $query->bindParam(':taskid', $taskid, PDO::PARAM_INT);
+        $query->execute();
+
+        $rowCount = $query->rowCount();
+        if ($rowCount === 0) {
+            if ($writeDB->inTransaction()) {
+                $writeDB->rollBack();
+            }
+            sendResponse(404, false, "Failed to upload image");
+        }
+        
+        $lastImageID = $writeDB->lastInsertId();
+
+        $sql = 'SELECT images.id, images.title, images.filename, images.mimetype, images.taskid
+                FROM images, tasks
+                WHERE images.id = :imageid
+                AND tasks.id = :taskid
+                AND tasks.user_id = :userid
+                AND images.taskid = tasks.id';
+        $query = $writeDB->prepare($sql);
+        $query->bindParam(':imageid', $lastImageID, PDO::PARAM_INT);
+        $query->bindParam(':taskid', $taskid, PDO::PARAM_INT);
+        $query->bindParam(':userid', $returned_userid, PDO::PARAM_INT);
+        $query->execute();
+
+        $rowCount = $query->rowCount();
+        if ($rowCount === 0) {
+            if ($writeDB->inTransaction()) {
+                $writeDB->rollBack();
+            }
+            sendResponse(500, false, "Failed to get image attributes");
+        }
+
+        $imageArray = [];
+
+        while($row = $query->fetch()) {
+            $image = new Image($row->id, $row->title, $row->filename, $row->mimetype, $row->taskid);
+            $imageArray[] = $image->returnImageAsArray();
+        }
+
+        $image->saveImageFile($_FILES['imagefile']['tmp_name']);
+
+        $writeDB->commit();
+
+        sendResponse(201, true, "Image uploaded", false, $imageArray);
+
+    } catch (PDOException $e) {
+        if ($writeDB->inTransaction()) {
+            $writeDB->rollBack();
+        }
+        sendResponse(500, false, "Failed to upload the image");
+    } catch (ImageException $e) {
+        if ($writeDB->inTransaction()) {
+            $writeDB->rollBack();
+        }
+        sendResponse(500, false, $e->getMessage());
+    }
+}
+
 function checkAuthStatusAndReturnUserID($writeDB) 
 {
     if (!isset($_SERVER['HTTP_AUTHORIZATION']) || strlen($_SERVER['HTTP_AUTHORIZATION']) < 1) {
@@ -41,7 +200,9 @@ function checkAuthStatusAndReturnUserID($writeDB)
         $query->execute();
 
         $rowCount = $query->rowCount();
-        ($rowCount === 0) ? sendResponse(401, false, "Invalid access token") : null;
+        if ($rowCount === 0) {
+            sendResponse(401, false, "Invalid access token");
+        }
 
         $row = $query->fetch();
         $returned_userid = $row->user_id;
@@ -49,9 +210,17 @@ function checkAuthStatusAndReturnUserID($writeDB)
         $returned_useractive = $row->useractive;
         $returned_loginattempts = $row->loginattempts;
 
-        ($returned_useractive !== 'Y') ? sendResponse(401, false, "User account not active") : null;
-        ($returned_loginattempts >= 3) ? sendResponse(401, false, "User account is currently locked") : null;
-        (strtotime($returned_accesstokenexpiry) < time()) ? sendResponse(401, false, "Access token expired") : null;
+        if ($returned_useractive !== 'Y') {
+            sendResponse(401, false, "User account not active");
+        } 
+
+        if ($returned_loginattempts >= 3) {
+            sendResponse(401, false, "User account is currently locked");
+        }
+        
+        if (strtotime($returned_accesstokenexpiry) < time()) {
+            sendResponse(401, false, "Access token expired");
+        } 
 
         return $returned_userid;
 
@@ -67,8 +236,6 @@ try {
     sendResponse(500, false, "Database connect error");
 }
 
-var_dump($writeDB);
-die();
 $returned_userid = checkAuthStatusAndReturnUserID($writeDB);
 
 // /tasks/1/images/1/attributes
@@ -77,8 +244,9 @@ if (array_key_exists("taskid", $_GET) && array_key_exists("imageid", $_GET) && a
     $imageid = $_GET['imageid'];
     $attributes = $_GET['attributes'];
 
-    ($imageid == '' || !is_numeric($imageid) || $taskid == '' || !is_numeric($taskid)) ?
-    sendResponse(400, false, "Image ID or Tsk ID can not be blank and must be number") : null;
+    if ($imageid == '' || !is_numeric($imageid) || $taskid == '' || !is_numeric($taskid)) {
+        sendResponse(400, false, "Image ID or Tsk ID can not be blank and must be number");
+    }
 
     if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 
@@ -98,8 +266,9 @@ elseif (array_key_exists("taskid", $_GET) && array_key_exists("imageid", $_GET))
     $taskid = $_GET['taskid'];
     $imageid = $_GET['imageid'];
 
-    ($imageid == '' || !is_numeric($imageid) || $taskid == '' || !is_numeric($taskid)) ?
-    sendResponse(400, false, "Image ID or Tsk ID can not be blank and must be number") : null;
+    if ($imageid == '' || !is_numeric($imageid) || $taskid == '' || !is_numeric($taskid)) {
+        sendResponse(400, false, "Image ID or Tsk ID can not be blank and must be number");
+    }
     
 
     if ($_SERVER['REQUEST_METHOD'] === 'GET') {
@@ -119,11 +288,12 @@ elseif (array_key_exists("taskid", $_GET) && array_key_exists("imageid", $_GET))
 elseif (array_key_exists("taskid", $_GET) && !array_key_exists("imageid", $_GET)) {
     $taskid = $_GET['taskid'];
     
-    ($taskid == '' || !is_numeric($taskid)) ? 
-    sendResponse(400, false, "Tsk ID can not be blank and must be number") : null;
+    if ($taskid == '' || !is_numeric($taskid)) {
+        sendResponse(400, false, "Tsk ID can not be blank and must be number");
+    } 
 
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-
+        uploadImageRoute($readDB, $writeDB, $taskid, $returned_userid);
     } 
     
     else {
