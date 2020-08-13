@@ -3,6 +3,7 @@
 require_once 'db.php';
 require_once '../Model/Response.php';
 require_once '../lib/cors.php';
+require_once '../lib/Send.php';
 
 // cors
 $CORS = new Cors();
@@ -11,12 +12,7 @@ $CORS();
 try {
     $writeDB = DB::connectWriteDB();
 } catch (PDOException $e) {
-    $response = new Response();
-    $response->setHttpStatusCode(500);
-    $response->setSuccess(false);
-    $response->addMessage("Database connect error");
-    $response->send();
-    exit();
+    Send::sendResponse(500, false, "Database connect error");
 }
 
 if (array_key_exists("sessionid", $_GET)) {

@@ -133,6 +133,19 @@ class Image
         $this->_taskid = $taskid;
     }
 
+    // image file delete
+    public function deleteImageFile() 
+    {
+        $filepath = $this->getUploadFolderLocation().$this->getTaskID()."/".$this->getFilename();
+
+        if (file_exists($filepath)) {
+            // 실행하고 실패하면 throw
+            if (!unlink($filepath)) {
+                throw new ImageException("Failed to delete image file");
+            }
+        }
+    }
+
     public function saveImageFile($tempFileName)
     {
         $uploadedFilePath = $this->getUploadFolderLocation().$this->getTaskID().'/'.$this->getFilename();
@@ -149,6 +162,20 @@ class Image
 
         if (!move_uploaded_file($tempFileName, $uploadedFilePath)) {
             throw new ImageException("Failed to upload image file");
+        }
+    }
+
+    public function renameImageFile($oldFileName, $newFileName) 
+    {
+        $originalFilePath = $this->getUploadFolderLocation().$this->getTaskID()."/".$oldFileName;
+        $renameFilePath = $this->getUploadFolderLocation().$this->getTaskID()."/".$newFileName;
+
+        if (!file_exists($originalFilePath)) {
+            throw new ImageException("Cannot find image file");
+        }
+
+        if (!rename($originalFilePath, $renameFilePath)) {
+            throw new ImageException("Failed to update the filename");
         }
     }
 
