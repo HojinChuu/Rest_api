@@ -180,6 +180,83 @@ function uploadImageRoute($readDB, $writeDB, $taskid, $returned_userid)
     }
 }
 
+function getImageAttributesRoute($readDB, $taskid, $imageid, $returned_userid)
+{
+    try {
+        
+        $sql = 'SELECT images.id, images.title, images.filename, images.mimetype, images.taskid
+                FROM images, tasks
+                WHERE images.id = :imageid
+                AND tasks.id = :taskid
+                AND tasks.user_id = :userid
+                AND images.taskid = tasks.id';
+        $query = $readDB->prepare($sql);
+        $query->bindParam(':imageid', $imageid, PDO::PARAM_INT);
+        $query->bindParam(':taskid', $taskid, PDO::PARAM_INT);
+        $query->bindParam(':userid', $returned_userid, PDO::PARAM_INT);
+        $query->execute();
+
+        $rowCount = $query->rowCount();
+        if ($rowCount === 0) {
+            sendResponse(404, false, "Image not found");
+        }
+
+        $imageArray = [];
+
+        while($row = $query->fetch()) {
+            $image = new Image($row->id, $row->title, $row->filename, $row->mimetype, $row->taskid);
+            $imageArray[] = $image->returnImageAsArray();
+        }
+
+        sendResponse(200, true, null, false, $imageArray);
+
+    } catch (ImageException $e) {
+        sendResponse(500, false, $e->getMessage());
+    } catch (PDOException $e) {
+        sendResponse(500, false, "Failed to get image attributes");
+    }
+}
+
+function getImageRoute($readDB, $taskid, $imageid, $returned_userid) 
+{
+    try {
+
+        $sql = 'SELECT images.id, images.title, images.filename, images.mimetype, images.taskid
+                FROM images, tasks
+                WHERE images.id = :imageid
+                AND tasks.id = :taskid
+                AND tasks.user_id = :userid
+                AND images.taskid = tasks.id';
+        $query = $readDB->prepare($sql);
+        $query->bindParam(':imageid', $imageid, PDO::PARAM_INT);
+        $query->bindParam(':taskid', $taskid, PDO::PARAM_INT);
+        $query->bindParam(':userid', $returned_userid, PDO::PARAM_INT);
+        $query->execute();
+
+        $rowCount = $query->rowCount();
+        if ($rowCount === 0) {
+            sendResponse(404, false, "Image not found");
+        }
+
+        $image = null;
+
+        while($row = $query->fetch()) {
+            $image = new Image($row->id, $row->title, $row->filename, $row->mimetype, $row->taskid);
+        }
+
+        if ($image == null) {
+            sendResponse(500, false, "Image not found");
+        }
+
+        $image->returnImageFile();
+        
+    } catch (ImageException $e) {
+        sendResponse(500, false, $e->getMessage());
+    } catch (PDOException $e) {
+        sendResponse(500, false, "Failed getting image");
+    }
+}
+
 function checkAuthStatusAndReturnUserID($writeDB) 
 {
     if (!isset($_SERVER['HTTP_AUTHORIZATION']) || strlen($_SERVER['HTTP_AUTHORIZATION']) < 1) {
@@ -249,14 +326,10 @@ if (array_key_exists("taskid", $_GET) && array_key_exists("imageid", $_GET) && a
     }
 
     if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+        getImageAttributesRoute($readDB, $taskid, $imageid, $returned_userid);
+    } elseif ($_SERVER['REQUEST_METHOD'] === 'PATCH') {
 
-    }
-
-    elseif ($_SERVER['REQUEST_METHOD'] === 'PATCH') {
-
-    }
-
-    else {
+    } else {
         sendResponse(405, false, "Request method not allowed");
     }
 }
@@ -270,16 +343,11 @@ elseif (array_key_exists("taskid", $_GET) && array_key_exists("imageid", $_GET))
         sendResponse(400, false, "Image ID or Tsk ID can not be blank and must be number");
     }
     
-
     if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+        getImageRoute($readDB, $taskid, $imageid, $returned_userid);
+    } elseif ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
 
-    }
-
-    elseif ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
-
-    }
-
-    else {
+    } else {
         sendResponse(405, false, "Request method not allowed");
     }
 }
@@ -294,9 +362,7 @@ elseif (array_key_exists("taskid", $_GET) && !array_key_exists("imageid", $_GET)
 
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         uploadImageRoute($readDB, $writeDB, $taskid, $returned_userid);
-    } 
-    
-    else {
+    } else {
         sendResponse(405, false, "Request method not allowed");
     }
 }
