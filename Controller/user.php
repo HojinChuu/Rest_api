@@ -3,6 +3,7 @@
 require_once 'db.php';
 require_once '../Model/Response.php';
 require_once '../lib/cors.php';
+require_once '../lib/Send.php';
 
 // cors
 $CORS = new Cors();
@@ -11,41 +12,21 @@ $CORS();
 try {
     $writeDB = DB::connectWriteDB();
 } catch (PDOException $e) {
-    $response = new Response();
-    $response->setHttpStatusCode(500);
-    $response->setSuccess(false);
-    $response->addMessage("Database connect error");
-    $response->send();
-    exit();
+    Send::sendResponse(500, false, "Database connect error");
 }
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    $response = new Response();
-    $response->setHttpStatusCode(405);
-    $response->setSuccess(false);
-    $response->addMessage("Request method not allowed");
-    $response->send();
-    exit();
+    Send::sendResponse(405, false, "Request method not allowed");
 }
 
 if ($_SERVER['CONTENT_TYPE'] !== 'application/json') {
-    $response = new Response();
-    $response->setHttpStatusCode(400);
-    $response->setSuccess(false);
-    $response->addMessage("Content type header not json");
-    $response->send();
-    exit();
+    Send::sendResponse(400, false, "Content type header not json");
 }
 
 $postData = file_get_contents('php://input');
 
 if (!$jsonData = json_decode($postData)) {
-    $response = new Response();
-    $response->setHttpStatusCode(400);
-    $response->setSuccess(false);
-    $response->addMessage("Request body is not valid json");
-    $response->send();
-    exit();
+    Send::sendResponse(400, false, "Request body is not valid json");
 }
 
 if (!isset($jsonData->fullname) || !isset($jsonData->username) || !isset($jsonData->password)) {
@@ -85,12 +66,7 @@ try {
 
     $rowCount = $query->rowCount();
     if ($rowCount !== 0) {
-        $response = new Response();
-        $response->setHttpStatusCode(409);
-        $response->setSuccess(false);
-        $response->addMessage("Username already exists");
-        $response->send();
-        exit();
+        Send::sendResponse(409, false, "Username already exists");
     }
 
     $hashed_password = password_hash($password, PASSWORD_DEFAULT);
@@ -104,12 +80,7 @@ try {
 
     $rowCount = $query->rowCount();
     if ($rowCount === 0) {
-        $response = new Response();
-        $response->setHttpStatusCode(500);
-        $response->setSuccess(false);
-        $response->addMessage("Failed to create user");
-        $response->send();
-        exit();
+        Send::sendResponse(500, false, "Failed to create user");
     }
 
     $lastUserID = $writeDB->lastInsertId();
@@ -119,20 +90,9 @@ try {
     $returnData['fullname'] = $fullname;
     $returnData['username'] = $username;
 
-    $response = new Response();
-    $response->setHttpStatusCode(201);
-    $response->setSuccess(true);
-    $response->addMessage("User created");
-    $response->setData($returnData);
-    $response->send();
-    exit();
+    Send::sendResponse(201, true, "User created", false, $returnData);
 
 } catch (PDOException $e) {
-    $response = new Response();
-    $response->setHttpStatusCode(500);
-    $response->setSuccess(false);
-    $response->addMessage("Failed to create user");
-    $response->send();
-    exit();
+    Send::sendResponse(500, false, "Failed to create user");
 }
 

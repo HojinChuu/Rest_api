@@ -2,23 +2,42 @@
 
 require_once 'db.php';
 require_once '../Model/Task.php';
+require_once '../Model/Image.php';
 require_once '../Model/Response.php';
 require_once '../lib/cors.php';
+require_once '../lib/Send.php';
 
 // cors
 $CORS = new Cors();
 $CORS();
 
+function searchTaskImages($dbConn, $taskid, $returned_userid)  
+{
+    $sql = 'SELECT images.id, images.title, images.filename, images.mimetype, images.taskid
+            FROM images, tasks
+            WHERE tasks.id = :taskid
+            AND tasks.user_id = :userid
+            AND tasks.id = images.taskid';
+    $imageQuery = $dbConn->prepare($sql);
+    $imageQuery->bindParam(':taskid', $taskid, PDO::PARAM_INT);
+    $imageQuery->bindParam(':userid', $returned_userid, PDO::PARAM_INT);
+    $imageQuery->execute();
+
+    $imageArray = array();
+
+    while($imageRow = $imageQuery->fetch()) {
+        $image = new Image($imageRow->id, $imageRow->title, $imageRow->filename, $imageRow->mimetype, $imageRow->taksid);
+        $imageArray[] = $image->returnImageAsArray();
+    }
+
+    return $imageArray;
+}
+
 try {
     $writeDB = DB::connectWriteDB();
     $readDB = DB::connectreadDB();
 } catch (PDOException $e) {
-    $response = new Response();
-    $response->setHttpStatusCode(500);
-    $response->setSuccess(false);
-    $response->addMessage("Database connect error");
-    $response->send();
-    exit();
+    Send::sendResponse(500, false, "Database connect error");
 }
 
 // AUTH check
@@ -45,12 +64,7 @@ try {
 
     $rowCount = $query->rowCount();
     if ($rowCount === 0) {
-        $response = new Response();
-        $response->setHttpStatusCode(401);
-        $response->setSuccess(false);
-        $response->addMessage("Invalid access token");
-        $response->send();
-        exit();
+        Send::sendResponse(401, false, "Invalid access token");
     }
 
     $row = $query->fetch();
@@ -60,39 +74,19 @@ try {
     $returned_loginattempts = $row->loginattempts;
 
     if ($returned_useractive !== 'Y') {
-        $response = new Response();
-        $response->setHttpStatusCode(401);
-        $response->setSuccess(false);
-        $response->addMessage("User account not active");
-        $response->send();
-        exit();
+        Send::sendResponse(401, false, "User account not active");
     }
 
     if ($returned_loginattempts >= 3) {
-        $response = new Response();
-        $response->setHttpStatusCode(401);
-        $response->setSuccess(false);
-        $response->addMessage("User account is currently locked");
-        $response->send();
-        exit();
+        Send::sendResponse(401, false, "User account is currently locked");
     }
 
     if (strtotime($returned_accesstokenexpiry) < time()) {
-        $response = new Response();
-        $response->setHttpStatusCode(401);
-        $response->setSuccess(false);
-        $response->addMessage("Access token expired");
-        $response->send();
-        exit();
+        Send::sendResponse(401, false, "Access token expired");
     }
 
 } catch (PDOException $e) {
-    $response = new Response();
-    $response->setHttpStatusCode(500);
-    $response->setSuccess(false);
-    $response->addMessage("Auth error");
-    $response->send();
-    exit();
+    Send::sendResponse(500, false, "Auth error");
 }
 // END AUTH logic
 
@@ -101,12 +95,7 @@ if (array_key_exists("taskid", $_GET)) {
     $taskId = $_GET['taskid'];
 
     if ($taskId == '' || !is_numeric($taskId)) {
-        $response = new Response();
-        $response->setHttpStatusCode(400);
-        $response->setSuccess(false);
-        $response->addMessage("Task ID can not be blank or must be numeric");
-        $response->send();
-        exit();
+        Send::sendResponse(400, false, "Task ID can not be blank or must be numeric");
     }
 
     // GET REQUEST
@@ -123,16 +112,12 @@ if (array_key_exists("taskid", $_GET)) {
 
             $rowCount = $query->rowCount();
             if ($rowCount === 0) {
-                $response = new Response();
-                $response->setHttpStatusCode(404);
-                $response->setSuccess(false);
-                $response->addMessage("Task not found");
-                $response->send();
-                exit(); 
+                Send::sendResponse(404, false, "Task not found");
             }
 
             while($row = $query->fetch()) {
-                $task = new Task($row->id, $row->title, $row->description, $row->deadline, $row->completed);
+                $imageArray = searchTaskImages($readDB, $taskId, $returned_userid);
+                $task = new Task($row->id, $row->title, $row->description, $row->deadline, $row->completed, $imageArray);
                 $taskArray[] = $task->returnTaskArray();
             }
 
@@ -140,34 +125,53 @@ if (array_key_exists("taskid", $_GET)) {
             $returnData['rows_returned'] = $rowCount;
             $returnData['tasks'] = $taskArray;
             
-            $response = new Response();
-            $response->setHttpStatusCode(200);
-            $response->setSuccess(true);
-            // $response->toCache(true);
-            $response->setData($returnData);
-            $response->send();
-            exit();
+            Send::sendResponse(200, true, null, false, $returnData);
 
+        } catch (ImageException $e) {
+            Send::sendResponse(500, false, $e->getMessage());
         } catch (TaskException $e) {
-            $response = new Response();
-            $response->setHttpStatusCode(500);
-            $response->setSuccess(false);
-            $response->addMessage($e->getMessage());
-            $response->send();
-            exit();
+            Send::sendResponse(500, false, $e->getMessage());
         } catch (PDOException $e) {
-            $response = new Response();
-            $response->setHttpStatusCode(500);
-            $response->setSuccess(false);
-            $response->addMessage("Failed to get Task");
-            $response->send();
-            exit();
+            Send::sendResponse(500, false, "Failed to get Task");
         }
     } 
 
     // DELETE REQUEST
     else if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
         try {
+
+            $sql = 'SELECT images.id, images.title, images.filename, images.mimetype, images.taskid
+                    FROM images, tasks
+                    WHERE tasks.id = :taskid
+                    AND tasks.user_id = :userid
+                    AND images.taskid = tasks.id';
+            $imageSelectQuery = $readDB->prepare($sql);
+            $imageSelectQuery->bindParam(':taskid', $taskId, PDO::PARAM_INT);
+            $imageSelectQuery->bindParam(':userid', $returned_userid, PDO::PARAM_INT);
+            $imageSelectQuery->execute();
+
+            while($imageRow = $imageSelectQuery->fetch()) {
+                $writeDB->beginTransaction();
+
+                $image = new Image($imageRow->id, $imageRow->title, $imageRow->filename, $imageRow->mimetype, $imageRow->taskid);
+                $imageID = $image->getID();
+
+                $sql = 'DELETE FROM images, tasks 
+                        WHERE images.id = :imageid
+                        AND images.taskid = :taskid 
+                        AND tasks.user_id = :userid 
+                        AND images.taskid = tasks.id';
+                $query = $writeDB->prepare($sql);
+                $query->bindParam(':imageid', $imageID, PDO::PARAM_INT);
+                $query->bindParam(':taskid', $taskId, PDO::PARAM_INT);
+                $query->bindParam(':userid', $returned_userid, PDO::PARAM_INT);
+                $query->execute();
+
+                $image->deleteImageFile();
+
+                $writeDB->commit();
+            }   
+
             $sql = 'DELETE FROM tasks WHERE id = :taskid AND user_id = :user_id';
             $query = $writeDB->prepare($sql);
             $query->bindParam(':taskid', $taskId, PDO::PARAM_INT);
@@ -176,28 +180,27 @@ if (array_key_exists("taskid", $_GET)) {
 
             $rowCount = $query->rowCount();
             if ($rowCount === 0) {
-                $response = new Response();
-                $response->setHttpStatusCode(404);
-                $response->setSuccess(false);
-                $response->addMessage("Task not found");
-                $response->send();
-                exit(); 
+                Send::sendResponse(404, false, "Task not found");
             }
 
-            $response = new Response();
-            $response->setHttpStatusCode(200);
-            $response->setSuccess(true);
-            $response->addMessage("Task deleted");
-            $response->send();
-            exit();
+            $taskImageFolder = "../images/".$taskId;
 
+            if (is_dir($taskImageFolder)) {
+                rmdir($taskImageFolder);
+            }
+
+            Send::sendResponse(200, true, "Task deleted");
+
+        } catch (ImageException $e) {
+            if ($writeDB->inTransaction()) {
+                $writeDB->rollBack();
+            }
+            Send::sendResponse(500, false, $e->getMessage());
         } catch (PDOException $e) {
-            $response = new Response();
-            $response->setHttpStatusCode(500);
-            $response->setSuccess(false);
-            $response->addMessage("Failed to delete Task");
-            $response->send();
-            exit();
+            if ($writeDB->inTransaction()) {
+                $writeDB->rollBack();
+            }
+            Send::sendResponse(500, false, "Failed to delete Task");
         }
     } 
     
@@ -205,24 +208,14 @@ if (array_key_exists("taskid", $_GET)) {
     else if ($_SERVER['REQUEST_METHOD'] === 'PATCH') {
         try {
             if ($_SERVER['CONTENT_TYPE'] !== 'application/json') {
-                $response = new Response();
-                $response->setHttpStatusCode(400);
-                $response->setSuccess(false);
-                $response->addMessage("Content type header is not set to JSON");
-                $response->send();
-                exit();
+                Send::sendResponse(400, false, "Content type header is not set to JSON");
             }
 
             $patchData = file_get_contents('php://input');
 
             // if(($jsonData = json_decode($patchData)) === false) {
             if(!$jsonData = json_decode($patchData)) {
-                $response = new Response();
-                $response->setHttpStatusCode(400);
-                $response->setSuccess(false);
-                $response->addMessage("Request body is not valid json");
-                $response->send();
-                exit();
+                Send::sendResponse(400, false, "Request body is not valid json");
             }
 
             $title_updated = false;
@@ -253,12 +246,7 @@ if (array_key_exists("taskid", $_GET)) {
             }
 
             if ($title_updated === false && $description_updated === false && $deadline_updated === false && $completed_updated === false) {
-                $response = new Response();
-                $response->setHttpStatusCode(400);
-                $response->setSuccess(false);
-                $response->addMessage("No task fields");
-                $response->send();
-                exit();
+                Send::sendResponse(400, false, "No task fields");
             }
 
             $queryFields = rtrim($queryFields, ", ");
@@ -274,12 +262,7 @@ if (array_key_exists("taskid", $_GET)) {
 
             $rowCount = $query->rowCount();
             if ($rowCount === 0) {
-                $response = new Response();
-                $response->setHttpStatusCode(404);
-                $response->setSuccess(false);
-                $response->addMessage("No task found to udpate");
-                $response->send();
-                exit();
+                Send::sendResponse(404, false, "No task found to udpate");
             }
 
             while($row = $query->fetch()) {
@@ -321,12 +304,7 @@ if (array_key_exists("taskid", $_GET)) {
             $rowCount = $query->rowCount();
 
             if ($rowCount === 0) {
-                $response = new Response();
-                $response->setHttpStatusCode(404);
-                $response->setSuccess(false);
-                $response->addMessage("Task not updated");
-                $response->send();
-                exit();
+                Send::sendResponse(404, false, "Task not updated");
             }
 
             $sql = 'SELECT id, title, description, DATE_FORMAT(deadline, "%d/%m/%Y %H:%i") AS deadline, completed 
@@ -341,18 +319,14 @@ if (array_key_exists("taskid", $_GET)) {
             $rowCount = $query->rowCount();
 
             if ($rowCount === 0) {
-                $response = new Response();
-                $response->setHttpStatusCode(404);
-                $response->setSuccess(false);
-                $response->addMessage("No task found after update");
-                $response->send();
-                exit();
+                Send::sendResponse(404, false, "No task found after update");
             }
 
             $taskArray = array();
 
             while($row = $query->fetch()) {
-                $task = new Task($row->id, $row->title, $row->description, $row->deadline, $row->completed);
+                $imageArray = searchTaskImages($writeDB, $taskId, $returned_userid);
+                $task = new Task($row->id, $row->title, $row->description, $row->deadline, $row->completed, $imageArray);
                 $taskArray[] = $task->returnTaskArray();
             }
 
@@ -360,39 +334,20 @@ if (array_key_exists("taskid", $_GET)) {
             $returnData['rows_returned'] = $rowCount;
             $returnData['tasks'] = $taskArray;
             
-            $response = new Response();
-            $response->setHttpStatusCode(200);
-            $response->setSuccess(true);
-            $response->addMessage("Task udpated");
-            $response->setData($returnData);
-            $response->send();
-            exit();
+            Send::sendResponse(200, true, "Task udpated", false, $returnData);
             
+        } catch (ImageException $e) {
+            Send::sendResponse(400, false, $e->getMessage());
         } catch (TaskException $e) {
-            $response = new Response();
-            $response->setHttpStatusCode(400);
-            $response->setSuccess(false);
-            $response->addMessage($e->getMessage());
-            $response->send();
-            exit();
+            Send::sendResponse(400, false, $e->getMessage());
         } catch (PDOException $e) {
-            $response = new Response();
-            $response->setHttpStatusCode(500);
-            $response->setSuccess(false);
-            $response->addMessage("Failed to update Task");
-            $response->send();
-            exit();
+            Send::sendResponse(500, false, "Failed to update Task");
         }
     } 
 
     // REQUEST
     else {
-        $response = new Response();
-        $response->setHttpStatusCode(405);
-        $response->setSuccess(false);
-        $response->addMessage("Request method not allowed");
-        $response->send();
-        exit();
+        Send::sendResponse(405, false, "Request method not allowed");
     }
 }
 
@@ -401,12 +356,7 @@ else if (array_key_exists("completed", $_GET)) {
     $completed = $_GET['completed'];
 
     if ($completed !== 'Y' && $completed !== 'N') {
-        $response = new Response();
-        $response->setHttpStatusCode(400);
-        $response->setSuccess(false);
-        $response->addMessage("Bad request");
-        $response->send();
-        exit();
+        Send::sendResponse(400, false, "Bad request");
     }
 
     // GET METHOD
@@ -425,7 +375,8 @@ else if (array_key_exists("completed", $_GET)) {
             $taskArray = array();
 
             while($row = $query->fetch()) {
-                $task = new Task($row->id, $row->title, $row->description, $row->deadline, $row->completed);
+                $imageArray = searchTaskImages($readDB, $row->id, $returned_userid);
+                $task = new Task($row->id, $row->title, $row->description, $row->deadline, $row->completed, $imageArray);
                 $taskArray[] = $task->returnTaskArray();
             }
 
@@ -433,39 +384,20 @@ else if (array_key_exists("completed", $_GET)) {
             $returnData['rows_returned'] = $rowCount;
             $returnData['tasks'] = $taskArray;
             
-            $response = new Response();
-            $response->setHttpStatusCode(200);
-            $response->setSuccess(true);
-            // $response->toCache(true);
-            $response->setData($returnData);
-            $response->send();
-            exit();
+            Send::sendResponse(200, true, null, false, $returnData);
 
+        } catch (ImageException $e) {
+            Send::sendResponse(500, false, $e->getMessage());
         } catch (TaskException $e) {
-            $response = new Response();
-            $response->setHttpStatusCode(500);
-            $response->setSuccess(false);
-            $response->addMessage($e->getMessage());
-            $response->send();
-            exit();
+            Send::sendResponse(500, false, $e->getMessage());
         } catch (PDOException $e) {
-            $response = new Response();
-            $response->setHttpStatusCode(500);
-            $response->setSuccess(false);
-            $response->addMessage("Failed to get Task");
-            $response->send();
-            exit();
+            Send::sendResponse(500, false, "Failed to get Task");
         }
     } 
     
     // REQUEST
     else {
-        $response = new Response();
-        $response->setHttpStatusCode(405);
-        $response->setSuccess(false);
-        $response->addMessage("Request method not allowed");
-        $response->send();
-        exit();
+        Send::sendResponse(405, false, "Request method not allowed");
     }
 }
 
@@ -477,12 +409,7 @@ else if (array_key_exists("page", $_GET)) {
         $page = $_GET['page'];
 
         if ($page == '' || !is_numeric($page)) {
-            $response = new Response();
-            $response->setHttpStatusCode(400);
-            $response->setSuccess(false);
-            $response->addMessage("Page number can not be balank and must be number");
-            $response->send();
-            exit();
+            Send::sendResponse(400, false, "Page number can not be balank and must be number");
         }
 
         $limitPerPage = 20;
@@ -503,12 +430,7 @@ else if (array_key_exists("page", $_GET)) {
             }
 
             if ($page > $numOfPages || $page == 0) {
-                $response = new Response();
-                $response->setHttpStatusCode(404);
-                $response->setSuccess(false);
-                $response->addMessage("Page not found");
-                $response->send();
-                exit();
+                Send::sendResponse(404, false, "Page not found");
             }
 
             $offset = ($page == 1 ? 0 : ($limitPerPage * ($page - 1)));
@@ -527,7 +449,8 @@ else if (array_key_exists("page", $_GET)) {
             $taskArray = array();
 
             while($row = $query->fetch()) {
-                $task = new Task($row->id, $row->title, $row->description, $row->deadline, $row->completed);
+                $imageArray = searchTaskImages($readDB, $row->id, $returned_userid);
+                $task = new Task($row->id, $row->title, $row->description, $row->deadline, $row->completed, $imageArray);
                 $taskArray[] = $task->returnTaskArray();
             }
 
@@ -539,39 +462,20 @@ else if (array_key_exists("page", $_GET)) {
             $page > 1 ? $returnData['has_previous_page'] = true : $returnData['has_previous_page'] = false;
             $returnData['tasks'] = $taskArray;
 
-            $response = new Response();
-            $response->setHttpStatusCode(200);
-            $response->setSuccess(true);
-            // $response->toCache(true);
-            $response->setData($returnData);
-            $response->send();
-            exit();
+            Send::sendResponse(200, true, null, false, $returnData);
 
+        } catch (ImageException $e) {
+            Send::sendResponse(500, false, $e->getMessage());
         } catch (TaskException $e) {
-            $response = new Response();
-            $response->setHttpStatusCode(500);
-            $response->setSuccess(false);
-            $response->addMessage($e->getMessage());
-            $response->send();
-            exit();
+            Send::sendResponse(500, false, $e->getMessage());
         } catch (PDOException $e) {
-            $response = new Response();
-            $response->setHttpStatusCode(500);
-            $response->setSuccess(false);
-            $response->addMessage("Failed to get Tasks");
-            $response->send();
-            exit();
+            Send::sendResponse(500, false, "Failed to get Tasks");
         }
     } 
     
     // REQUEST
     else {
-        $response = new Response();
-        $response->setHttpStatusCode(405);
-        $response->setSuccess(false);
-        $response->addMessage("Request method not allowed");
-        $response->send();
-        exit();
+        Send::sendResponse(405, false, "Request method not allowed");
     }
 }
 
@@ -592,7 +496,8 @@ else if (empty($_GET)) {
             $taskArray = array();
 
             while($row = $query->fetch()) {
-                $task = new Task($row->id, $row->title, $row->description, $row->deadline, $row->completed);
+                $imageArray = searchTaskImages($readDB, $row->id, $returned_userid);
+                $task = new Task($row->id, $row->title, $row->description, $row->deadline, $row->completed, $imageArray);
                 $taskArray[] = $task->returnTaskArray();
             }
 
@@ -600,28 +505,14 @@ else if (empty($_GET)) {
             $returnData['rows_returned'] = $rowCount;
             $returnData['tasks'] = $taskArray;
             
-            $response = new Response();
-            $response->setHttpStatusCode(200);
-            $response->setSuccess(true);
-            // $response->toCache(true);
-            $response->setData($returnData);
-            $response->send();
-            exit();
+            Send::sendResponse(200, true, null, false, $returnData);
 
+        } catch (ImageException $e) {
+            Send::sendResponse(500, false, $e->getMessage());
         } catch (TaskException $e) {
-            $response = new Response();
-            $response->setHttpStatusCode(500);
-            $response->setSuccess(false);
-            $response->addMessage($e->getMessage());
-            $response->send();
-            exit();
+            Send::sendResponse(500, false, $e->getMessage());
         } catch (PDOException $e) {
-            $response = new Response();
-            $response->setHttpStatusCode(500);
-            $response->setSuccess(false);
-            $response->addMessage("Failed to get Tasks");
-            $response->send();
-            exit();
+            Send::sendResponse(500, false, "Failed to get Tasks");
         }
     } 
     
@@ -629,24 +520,14 @@ else if (empty($_GET)) {
     else if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             if ($_SERVER['CONTENT_TYPE'] !== 'application/json') {
-                $response = new Response();
-                $response->setHttpStatusCode(400);
-                $response->setSuccess(false);
-                $response->addMessage("Content type header is not set to JSON");
-                $response->send();
-                exit();
+                Send::sendResponse(400, false, "Content type header is not set to JSON");
             }
 
             $postData = file_get_contents('php://input');
 
             // if(($jsonData = json_decode($postData)) === false) {
             if(!$jsonData = json_decode($postData)) {
-                $response = new Response();
-                $response->setHttpStatusCode(400);
-                $response->setSuccess(false);
-                $response->addMessage("Request body is not valid json");
-                $response->send();
-                exit();
+                Send::sendResponse(400, false, "Request body is not valid json");
             }
 
             if (!isset($jsonData->title) || !isset($jsonData->completed)) {
@@ -678,12 +559,7 @@ else if (empty($_GET)) {
 
             $rowCount = $query->rowCount();
             if ($rowCount === 0) {
-                $response = new Response();
-                $response->setHttpStatusCode(500);
-                $response->setSuccess(false);
-                $response->addMessage("Failed to create Task");
-                $response->send();
-                exit();
+                Send::sendResponse(500, false, "Failed to create Task");
             }
 
             $lastTaskID = $writeDB->lastInsertId();
@@ -699,12 +575,7 @@ else if (empty($_GET)) {
 
             $rowCount = $query->rowCount();
             if ($rowCount === 0) {
-                $response = new Response();
-                $response->setHttpStatusCode(500);
-                $response->setSuccess(false);
-                $response->addMessage("Failed to retrieve task after create");
-                $response->send();
-                exit();
+                Send::sendResponse(500, false, "Failed to retrieve task after create");
             }
 
             $taskArray = array();
@@ -718,48 +589,22 @@ else if (empty($_GET)) {
             $returnData['rows_returned'] = $rowCount;
             $returnData['tasks'] = $taskArray;
             
-            $response = new Response();
-            $response->setHttpStatusCode(201);
-            $response->setSuccess(true);
-            $response->addMessage("Task created");
-            $response->setData($returnData);
-            $response->send();
-            exit();
+            Send::sendResponse(201, true, "Task created", false, $returnData);
 
         } catch (TaskException $e) {
-            $response = new Response();
-            $response->setHttpStatusCode(400);
-            $response->setSuccess(false);
-            $response->addMessage($e->getMessage());
-            $response->send();
-            exit();
+            Send::sendResponse(400, false, $e->getMessage());
         } catch (PDOException $e) {
-            $response = new Response();
-            $response->setHttpStatusCode(500);
-            $response->setSuccess(false);
-            $response->addMessage("Failed to insert Tasks");
-            $response->send();
-            exit();
+            Send::sendResponse(500, false, "Failed to insert Tasks");
         }
     } 
 
     // REQUEST
     else {
-        $response = new Response();
-        $response->setHttpStatusCode(405);
-        $response->setSuccess(false);
-        $response->addMessage("Request method not allowed");
-        $response->send();
-        exit();
+        Send::sendResponse(405, false, "Request method not allowed");
     }
 }
 
 // error response
 else {
-    $response = new Response();
-    $response->setHttpStatusCode(404);
-    $response->setSuccess(false);
-    $response->addMessage("Endpoint not found");
-    $response->send();
-    exit();
+    Send::sendResponse(404, false, "Endpoint not found");
 }
