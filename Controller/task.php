@@ -26,7 +26,7 @@ function searchTaskImages($dbConn, $taskid, $returned_userid)
     $imageArray = array();
 
     while($imageRow = $imageQuery->fetch()) {
-        $image = new Image($imageRow->id, $imageRow->title, $imageRow->filename, $imageRow->mimetype, $imageRow->taksid);
+        $image = new Image($imageRow->id, $imageRow->title, $imageRow->filename, $imageRow->mimetype, $imageRow->taskid);
         $imageArray[] = $image->returnImageAsArray();
     }
 
@@ -156,7 +156,7 @@ if (array_key_exists("taskid", $_GET)) {
                 $image = new Image($imageRow->id, $imageRow->title, $imageRow->filename, $imageRow->mimetype, $imageRow->taskid);
                 $imageID = $image->getID();
 
-                $sql = 'DELETE FROM images, tasks 
+                $sql = 'DELETE images FROM images, tasks 
                         WHERE images.id = :imageid
                         AND images.taskid = :taskid 
                         AND tasks.user_id = :userid 

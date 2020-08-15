@@ -18,7 +18,8 @@ function uploadImageRoute($readDB, $writeDB, $taskid, $returned_userid)
         }
 
         $sql = 'SELECT id FROM tasks 
-                WHERE id = :taskid AND user_id = :userid';
+                WHERE id = :taskid 
+                AND user_id = :userid';
         $query = $readDB->prepare($sql);
         $query->bindParam(':taskid', $taskid, PDO::PARAM_INT);
         $query->bindParam(':userid', $returned_userid, PDO::PARAM_INT);
