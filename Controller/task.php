@@ -152,7 +152,6 @@ if (array_key_exists("taskid", $_GET)) {
 
             while($imageRow = $imageSelectQuery->fetch()) {
                 $writeDB->beginTransaction();
-
                 $image = new Image($imageRow->id, $imageRow->title, $imageRow->filename, $imageRow->mimetype, $imageRow->taskid);
                 $imageID = $image->getID();
 
